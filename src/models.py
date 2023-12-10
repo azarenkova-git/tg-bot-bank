@@ -27,6 +27,6 @@ class TransactionModel(AbstractModel):
     __tablename__ = 'transactions'
 
     user_id = Column(Integer, ForeignKey('users.id'))
-    amount = Column(Numeric)
+    amount = Column(Integer)
     user = relationship('UserModel', back_populates='transactions')
     date = Column(DateTime)

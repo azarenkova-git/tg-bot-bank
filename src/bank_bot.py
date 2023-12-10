@@ -1,3 +1,5 @@
+import math
+
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, CallbackContext, \
     CallbackQueryHandler
@@ -44,6 +46,7 @@ class BankBot:
             CommandHandler("help", self._show_help),
             CallbackQueryHandler(self._list_transactions),
             MessageHandler(filters.CONTACT, self._handle_received_contact),
+            MessageHandler(filters.TEXT, self._show_help),
         ]
 
         for handler in handlers:
@@ -123,7 +126,7 @@ class BankBot:
         balance = self._logic.get_balance(update.effective_user.id)
         await update.message.reply_text(f"Ваш баланс: {balance}")
 
-    def _paginate_transactions(self, transactions: list[TransactionModel], page: int, per_page=5):
+    def _paginate_transactions(self, transactions: list[TransactionModel], page: int, per_page):
         start = page * per_page
         end = start + per_page
         return transactions[start:end]
@@ -132,26 +135,80 @@ class BankBot:
     async def _list_transactions(self, update: Update, _: ContextTypes) -> None:
         """Вывод списка транзакций пользователя"""
 
+        per_page = 3
+
         transactions = self._logic.get_transactions(update.effective_user.id)
+        total_pages = math.ceil(len(transactions) / per_page)
 
         if update.callback_query:
             await update.callback_query.answer()
 
         page = int(update.callback_query.data) if update.callback_query and update.callback_query.data.isdigit() else 0
-        items = self._paginate_transactions(transactions, page)
+        page = max(0, min(page, total_pages - 1))
 
-        message_text = "Нет транзакций" if len(transactions) == 0 else "\n".join([f"{item.date}: ${item.amount}" for item in items])
+        current_transactions = self._paginate_transactions(transactions, page, per_page)
 
-        keyboard = [
-            [InlineKeyboardButton("Previous", callback_data=str(page - 1)),
-             InlineKeyboardButton("Next", callback_data=str(page + 1))]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        if not len(current_transactions):
+            message_text = "Нет транзакций"
+
+        else:
+            message_text = f"Страница {page + 1} из {total_pages}\n"
+            get_trx_text = lambda item: f"{item.date.strftime('%Y-%m-%d %H:%M:%S')}: {item.amount}"
+            message_text += "\n".join([get_trx_text(trx) for trx in current_transactions])
+
+        keyboard = []
+
+        if page > 0:
+            keyboard.append(InlineKeyboardButton("Предыдущая страница", callback_data=str(page - 1)))
+
+        if page < total_pages - 1:
+            keyboard.append(InlineKeyboardButton("Следующая страница", callback_data=str(page + 1)))
+
+        reply_markup = InlineKeyboardMarkup([keyboard])
 
         if update.callback_query:
             await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup)
         else:
             await update.message.reply_text(text=message_text, reply_markup=reply_markup)
+
+    @with_auth
+    async def _send_money(self, update: Update, context: CallbackContext) -> None:
+        """Перевод денег другому пользователю"""
+
+        usage_text = "Использование: /send_money <номер телефона> <сумма>"
+
+        phone_number = context.args[0] if context.args else None
+
+        if phone_number is None:
+            await update.message.reply_text("Пожалуйста, введите номер телефона получателя. " + usage_text)
+            return
+
+        recipient = self._logic.find_user_by_phone_number(phone_number)
+
+        if recipient is None:
+            await update.message.reply_text("Получатель не найден.")
+            return
+
+        sum_arg = context.args[1] if len(context.args) > 1 else None
+
+        if sum_arg is None:
+            await update.message.reply_text("Пожалуйста, введите сумму перевода. " + usage_text)
+            return
+
+        try:
+            sum_value = int(sum_arg)
+
+            if sum_value <= 0:
+                await update.message.reply_text("Пожалуйста, введите положительное число для суммы.")
+                return
+
+            self._logic.send_money(update.effective_user.id, phone_number, sum_value)
+
+            await update.message.reply_text(f"Перевод в размере {sum_value} успешно выполнен.")
+
+        except ValueError:
+            await update.message.reply_text("Пожалуйста, введите число для суммы.")
+            return
 
     @with_auth
     async def _show_help(self, update: Update, _: ContextTypes) -> None:

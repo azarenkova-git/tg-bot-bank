@@ -16,7 +16,8 @@ class SnakeGameTests(unittest.TestCase):
     def before_each(self):
         self._session = setup_session()
         self._logic = BankBotLogic(self._session)
-        self._logic.find_or_register_user("123", "123", 1)
+        self._logic.find_or_register_user("1", "User 1", 1)
+        self._logic.find_or_register_user("2", "User 2", 2)
 
         yield
 
@@ -40,6 +41,12 @@ class SnakeGameTests(unittest.TestCase):
         self._logic.deposit(1, 100)
         self._logic.withdraw(1, 100)
         self.assertEqual(len(self._logic.get_transactions(1)), 2)
+
+    def test_send_money(self):
+        self._logic.deposit(1, 100)
+        self._logic.send_money(1, "2", 50)
+        self.assertEqual(self._logic.get_balance(1), 50)
+        self.assertEqual(self._logic.get_balance(2), 50)
 
 
 if __name__ == "__main__":

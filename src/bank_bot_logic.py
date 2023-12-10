@@ -17,7 +17,7 @@ class BankBotLogic:
         Находит и возвращает пользователя по номеру телефона, либо регистрирует нового пользователя
         """
 
-        user = self._session.query(UserModel).filter(UserModel.phone_number == phone_number).first()
+        user = self.find_user_by_phone_number(phone_number)
 
         if user is None:
             user = UserModel(phone_number=phone_number, name=name, tg_user_id=tg_user_id)
@@ -30,6 +30,11 @@ class BankBotLogic:
         """Находит пользователя по tg_id"""
 
         return self._session.query(UserModel).filter(UserModel.tg_user_id == tg_user_id).first()
+
+    def find_user_by_phone_number(self, phone_number: str) -> UserModel:
+        """Находит пользователя по номеру телефона"""
+
+        return self._session.query(UserModel).filter(UserModel.phone_number == phone_number).first()
 
     def user_exists_by_tg_id(self, tg_user_id: str) -> bool:
         """Проверка, что пользователь зарегистрирован в системе"""
@@ -54,6 +59,23 @@ class BankBotLogic:
         user.balance -= amount
 
         transaction = TransactionModel(amount=-amount, user_id=user.id, date=datetime.now())
+        self._session.add(transaction)
+
+        self._session.commit()
+
+    def send_money(self, sender_tg_user_id: int, recipient_phone_number: str, amount: int) -> None:
+        """Перевод денег от одного пользователя другому"""
+
+        sender = self.find_user_by_tg_id(sender_tg_user_id)
+        recipient = self.find_user_by_phone_number(recipient_phone_number)
+
+        sender.balance -= amount
+        recipient.balance += amount
+
+        transaction = TransactionModel(amount=-amount, user_id=sender.id, date=datetime.now())
+        self._session.add(transaction)
+
+        transaction = TransactionModel(amount=amount, user_id=recipient.id, date=datetime.now())
         self._session.add(transaction)
 
         self._session.commit()
