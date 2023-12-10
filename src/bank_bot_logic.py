@@ -7,6 +7,8 @@ from src.models import UserModel, TransactionModel
 
 
 class BankBotLogic:
+    """Класс, реализующий логику ("бекенд") бота"""
+
     _session: Session
 
     def __init__(self, session: Session):
@@ -92,3 +94,10 @@ class BankBotLogic:
             .filter(TransactionModel.user_id == user.id) \
             .order_by(desc(TransactionModel.date)) \
             .all()
+
+    def delete_user(self, tg_user_id: int) -> None:
+        """Удаляет пользователя из системы"""
+
+        user = self.find_user_by_tg_id(tg_user_id)
+        self._session.delete(user)
+        self._session.commit()

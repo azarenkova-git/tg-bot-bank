@@ -22,6 +22,8 @@ def with_auth(func):
 
 
 class BankBot:
+    """Класс, который реализует "фронтенд" бота - прием и отправку сообщений, обработку команд"""
+
     def __init__(self, token: str, persist=False):
         self._session = setup_session(persist)
         self._logic = BankBotLogic(self._session)
@@ -34,6 +36,7 @@ class BankBot:
             BotCommand("transactions", "Посмотреть список транзакций"),
             BotCommand("user_info", "Информация о пользователе"),
             BotCommand("send_money", "<phone_number> <amount> Перевести деньги"),
+            BotCommand("delete_self", "Удалить себя из системы"),
             BotCommand("help", "Показать справку"),
         ]
 
@@ -47,6 +50,7 @@ class BankBot:
             CommandHandler("transactions", self._list_transactions),
             CommandHandler("user_info", self._show_user_info),
             CommandHandler("send_money", self._send_money),
+            CommandHandler("delete_self", self._delete_self),
             CommandHandler("help", self._show_help),
             CallbackQueryHandler(self._list_transactions),
             MessageHandler(filters.CONTACT, self._handle_received_contact),
@@ -240,6 +244,13 @@ class BankBot:
         except ValueError:
             await update.message.reply_text("Пожалуйста, введите число для суммы")
             return
+
+    @with_auth
+    async def _delete_self(self, update: Update, _: ContextTypes) -> None:
+        """Удаление пользователя из системы"""
+
+        self._logic.delete_user(update.effective_user.id)
+        await update.message.reply_text("Вы удалены из системы")
 
     @with_auth
     async def _show_help(self, update: Update, _: ContextTypes) -> None:

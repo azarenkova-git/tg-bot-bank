@@ -48,6 +48,10 @@ class SnakeGameTests(unittest.TestCase):
         self.assertEqual(self._logic.get_balance(1), 50)
         self.assertEqual(self._logic.get_balance(2), 50)
 
+    def test_user_deletion(self):
+        self._logic.delete_user(1)
+        self.assertFalse(self._logic.user_exists_by_tg_id(1))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,8 @@ Base = declarative_base()
 
 
 class AbstractModel(Base):
+    """Абстрактная модель"""
+
     __abstract__ = True
 
     id = Column(Integer, primary_key=True)
@@ -14,6 +16,8 @@ class AbstractModel(Base):
 
 
 class UserModel(AbstractModel):
+    """Модель пользователя"""
+
     __tablename__ = 'users'
 
     phone_number = Column(String, unique=True)
@@ -24,6 +28,8 @@ class UserModel(AbstractModel):
 
 
 class TransactionModel(AbstractModel):
+    """Модель транзакции"""
+
     __tablename__ = 'transactions'
 
     user_id = Column(Integer, ForeignKey('users.id'))
