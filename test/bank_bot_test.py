@@ -16,8 +16,8 @@ class SnakeGameTests(unittest.TestCase):
     def before_each(self):
         self._session = setup_session()
         self._logic = BankBotLogic(self._session)
-        self._logic.find_or_register_user("1", "User 1", 1)
-        self._logic.find_or_register_user("2", "User 2", 2)
+        self._logic.register_user("1", "User 1", 1)
+        self._logic.register_user("2", "User 2", 2)
 
         yield
 

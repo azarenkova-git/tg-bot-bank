@@ -12,17 +12,14 @@ class BankBotLogic:
     def __init__(self, session: Session):
         self._session = session
 
-    def find_or_register_user(self, phone_number: str, name: str, tg_user_id: str) -> UserModel:
+    def register_user(self, phone_number: str, name: str, tg_user_id: str) -> UserModel:
         """
         Находит и возвращает пользователя по номеру телефона, либо регистрирует нового пользователя
         """
 
-        user = self.find_user_by_phone_number(phone_number)
-
-        if user is None:
-            user = UserModel(phone_number=phone_number, name=name, tg_user_id=tg_user_id)
-            self._session.add(user)
-            self._session.commit()
+        user = UserModel(phone_number=phone_number, name=name, tg_user_id=tg_user_id)
+        self._session.add(user)
+        self._session.commit()
 
         return user
 

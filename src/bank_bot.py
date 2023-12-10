@@ -32,6 +32,8 @@ class BankBot:
             BotCommand("balance", "Проверить баланс"),
             BotCommand("withdraw", "<amount> Снять деньги"),
             BotCommand("transactions", "Посмотреть список транзакций"),
+            BotCommand("user_info", "Информация о пользователе"),
+            BotCommand("send_money", "<phone_number> <amount> Перевести деньги"),
             BotCommand("help", "Показать справку"),
         ]
 
@@ -43,6 +45,8 @@ class BankBot:
             CommandHandler("balance", self._show_balance),
             CommandHandler("withdraw", self._make_withdraw),
             CommandHandler("transactions", self._list_transactions),
+            CommandHandler("user_info", self._show_user_info),
+            CommandHandler("send_money", self._send_money),
             CommandHandler("help", self._show_help),
             CallbackQueryHandler(self._list_transactions),
             MessageHandler(filters.CONTACT, self._handle_received_contact),
@@ -62,15 +66,33 @@ class BankBot:
     async def _reply_with_contact_request(self, update: Update, _: ContextTypes) -> None:
         """Запрос контактов пользователя"""
 
+        user = self._logic.find_user_by_tg_id(update.effective_user.id)
+
+        if user is not None:
+            await self._reply_with_you_already_registered(update, _)
+            return
+
         contact_keyboard = KeyboardButton("Предоставьте номер телефона", request_contact=True)
         reply_markup = ReplyKeyboardMarkup([[contact_keyboard]], resize_keyboard=True, one_time_keyboard=True)
         await update.message.reply_text("Пожалуйста, пройдите аутентификацию", reply_markup=reply_markup)
+
+    async def _reply_with_you_already_registered(self, update: Update, _: ContextTypes) -> None:
+        """Вывод сообщения, что пользователь уже зарегистрирован"""
+
+        await update.message.reply_text(f"Вы уже зарегистрированы в системе")
 
     async def _handle_received_contact(self, update: Update, _: ContextTypes) -> None:
         """Обработка полученных контактов пользователя"""
 
         contact = update.message.contact
-        self._logic.find_or_register_user(contact.phone_number, contact.first_name, update.effective_user.id)
+
+        user = self._logic.find_user_by_tg_id(update.effective_user.id)
+
+        if user is not None:
+            await self._reply_with_you_already_registered(update, _)
+            return
+
+        self._logic.register_user(contact.phone_number, contact.first_name, update.effective_user.id)
         await update.message.reply_text(f"Аутентификация пройдена")
 
     @with_auth
@@ -110,9 +132,9 @@ class BankBot:
             sum_value = int(sum_arg)
 
             if sum_value <= 0:
-                await update.message.reply_text("Пожалуйста, введите положительное число для суммы.")
+                await update.message.reply_text("Пожалуйста, введите положительное число для суммы")
             else:
-                await update.message.reply_text(f"Снятие в размере {sum_value} успешно принято.")
+                await update.message.reply_text(f"Снятие в размере {sum_value} успешно принято")
 
             self._logic.withdraw(update.effective_user.id, sum_value)
 
@@ -125,6 +147,13 @@ class BankBot:
 
         balance = self._logic.get_balance(update.effective_user.id)
         await update.message.reply_text(f"Ваш баланс: {balance}")
+
+    @with_auth
+    async def _show_user_info(self, update: Update, _: ContextTypes) -> None:
+        """Вывод информации о пользователе"""
+
+        user = self._logic.find_user_by_tg_id(update.effective_user.id)
+        await update.message.reply_text(f"Информация о пользователе: {user.name} {user.phone_number}")
 
     def _paginate_transactions(self, transactions: list[TransactionModel], page: int, per_page):
         start = page * per_page
@@ -186,7 +215,7 @@ class BankBot:
         recipient = self._logic.find_user_by_phone_number(phone_number)
 
         if recipient is None:
-            await update.message.reply_text("Получатель не найден.")
+            await update.message.reply_text("Получатель не найден")
             return
 
         sum_arg = context.args[1] if len(context.args) > 1 else None
@@ -204,10 +233,12 @@ class BankBot:
 
             self._logic.send_money(update.effective_user.id, phone_number, sum_value)
 
-            await update.message.reply_text(f"Перевод в размере {sum_value} успешно выполнен.")
+            await update.message.reply_text(f"Перевод в размере {sum_value} успешно выполнен")
+
+            await context.bot.send_message(recipient.tg_user_id, f"Вам перевели {sum_value}")
 
         except ValueError:
-            await update.message.reply_text("Пожалуйста, введите число для суммы.")
+            await update.message.reply_text("Пожалуйста, введите число для суммы")
             return
 
     @with_auth
